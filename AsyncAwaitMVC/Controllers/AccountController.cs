@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Globalization;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
@@ -34,9 +36,9 @@ namespace AsyncAwaitMVC.Controllers
             {
                 return _signInManager ?? HttpContext.GetOwinContext().Get<ApplicationSignInManager>();
             }
-            private set 
-            { 
-                _signInManager = value; 
+            private set
+            {
+                _signInManager = value;
             }
         }
 
@@ -116,9 +118,9 @@ namespace AsyncAwaitMVC.Controllers
                 return View(model);
             }
 
-            // The following code protects for brute force attacks against the two factor codes. 
-            // If a user enters incorrect codes for a specified amount of time then the user account 
-            // will be locked out for a specified amount of time. 
+            // The following code protects for brute force attacks against the two factor codes.
+            // If a user enters incorrect codes for a specified amount of time then the user account
+            // will be locked out for a specified amount of time.
             // You can configure the account lockout settings in IdentityConfig
             var result = await SignInManager.TwoFactorSignInAsync(model.Provider, model.Code, isPersistent:  model.RememberMe, rememberBrowser: model.RememberBrowser);
             switch (result)
@@ -151,21 +153,19 @@ namespace AsyncAwaitMVC.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
-                var result = await UserManager.CreateAsync(user, model.Password);
-                if (result.Succeeded)
-                {
-                    await SignInManager.SignInAsync(user, isPersistent:false, rememberBrowser:false);
-                    
-                    // For more information on how to enable account confirmation and password reset please visit http://go.microsoft.com/fwlink/?LinkID=320771
-                    // Send an email with this link
-                    // string code = await UserManager.GenerateEmailConfirmationTokenAsync(user.Id);
-                    // var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: Request.Url.Scheme);
-                    // await UserManager.SendEmailAsync(user.Id, "Confirm your account", "Please confirm your account by clicking <a href=\"" + callbackUrl + "\">here</a>");
+                var availableWorkingThreadCount = 0;
+                var availableAsyncIoThreadCount = 0;
+                ThreadPool.GetAvailableThreads(out availableWorkingThreadCount, out availableAsyncIoThreadCount);
+                AddErrors(new IdentityResult(string.Format("[IIS Host] Thread Id {0}, ThreadPool Thread: {1}",
+                    Thread.CurrentThread.ManagedThreadId, Thread.CurrentThread.IsThreadPoolThread)));
+                AddErrors(new IdentityResult(string.Format("[IIS Host] current working thread: {0}, current async thread: {1}", availableWorkingThreadCount, availableAsyncIoThreadCount)));
 
-                    return RedirectToAction("Index", "Home");
-                }
-                AddErrors(result);
+                HttpClient httpClient = new HttpClient();
+                var response = httpClient.GetStringAsync("https://msdn.microsoft.com/en-us/library/system.threading.thread.isthreadpoolthread(v=vs.110).aspx");
+                await response;
+
+                AddErrors(new IdentityResult(string.Format("[IIS Host] Thread Id {0}, ThreadPool Thread: {1}",
+                Thread.CurrentThread.ManagedThreadId, Thread.CurrentThread.IsThreadPoolThread)));
             }
 
             // If we got this far, something failed, redisplay form
@@ -212,7 +212,7 @@ namespace AsyncAwaitMVC.Controllers
                 // For more information on how to enable account confirmation and password reset please visit http://go.microsoft.com/fwlink/?LinkID=320771
                 // Send an email with this link
                 // string code = await UserManager.GeneratePasswordResetTokenAsync(user.Id);
-                // var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: Request.Url.Scheme);		
+                // var callbackUrl = Url.Action("ResetPassword", "Account", new { userId = user.Id, code = code }, protocol: Request.Url.Scheme);
                 // await UserManager.SendEmailAsync(user.Id, "Reset Password", "Please reset your password by clicking <a href=\"" + callbackUrl + "\">here</a>");
                 // return RedirectToAction("ForgotPasswordConfirmation", "Account");
             }
