@@ -20,11 +20,37 @@ namespace AsyncAwaitConsole
             {
                 for (int i = 0; i < Environment.ProcessorCount * 2; i++)
                 {
-                   Task.Factory.StartNew(Console.WriteLine, new {Id = i});
+                   Task.Factory.StartNew(SyncJob, new {Id = i});
+                }
+            });
+
+            Console.WriteLine("===========================================");
+
+            LogRunningTime(() =>
+            {
+                for (int i = 0; i < Environment.ProcessorCount * 2; i++)
+                {
+                    Task.Factory.StartNew(AsyncJob, new { Id = i });
                 }
             });
 
             Console.ReadKey();
+        }
+
+        static void SyncJob(dynamic stateInfo)
+        {
+            var id = (long)stateInfo.Id;
+            Console.WriteLine("Job Id: {0}, sync starting...", id);
+            Thread.Sleep(2000);
+            Console.WriteLine("Job Id: {0}, completed...", id);
+        }
+
+        static async Task AsyncJob(dynamic stateInfo)
+        {
+            var id = (long)stateInfo.Id;
+            Console.WriteLine("Job Id: {0}, sync starting...", id);
+            await Task.Delay(2000);
+            Console.WriteLine("Job Id: {0}, completed...", id);
         }
 
         static void LogRunningTime(Action callback)
