@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,6 +14,49 @@ namespace AsyncAwaitConsole
         const string UserDirectory = @"files\";
         const int BufferSize = 1024 * 4;
 
+        async static Task<int> AccessTheWebAsync()
+        {
+            // You need to add a reference to System.Net.Http to declare client.
+            HttpClient client = new HttpClient();
+
+            // GetStringAsync returns a Task<string>. That means that when you await the
+            // task you'll get a string (urlContents).
+//            Task<string> getStringTask = client.GetStringAsync("http://msdn.microsoft.com");
+            Task<string> getStringTask = DoAsync();
+
+            // You can do work here that doesn't rely on the string from GetStringAsync.
+
+            // The await operator suspends AccessTheWebAsync.
+            //  - AccessTheWebAsync can't continue until getStringTask is complete.
+            //  - Meanwhile, control returns to the caller of AccessTheWebAsync.
+            //  - Control resumes here when getStringTask is complete.
+            //  - The await operator then retrieves the string result from getStringTask.
+            string urlContents = await getStringTask;
+
+            // The return statement specifies an integer result.
+            // Any methods that are awaiting AccessTheWebAsync retrieve the length value.
+            return urlContents.Length;
+        }
+
+        static void DoIndependentWork()
+        {
+            Console.WriteLine("Do some working...");
+        }
+
+        async static Task<string> DoAsync()
+        {
+            System.Threading.Thread.Sleep(10000);
+
+            Console.WriteLine("Sending http request...");
+            return "1024";
+        }
+
+        static async void wrapper()
+        {
+            var result = await AccessTheWebAsync();
+            DoIndependentWork();
+        }
+
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) =>
@@ -24,15 +68,18 @@ namespace AsyncAwaitConsole
             maxAsyncIoThreadNum = Environment.ProcessorCount;
             ThreadPool.SetMaxThreads(maxWorkerThreads, maxAsyncIoThreadNum);
 
+
+            Console.WriteLine("===================== Sync Job ======================");
+
             LogRunningTime(() =>
             {
                 for (int i = 0; i < Environment.ProcessorCount * 2; i++)
                 {
-                   Task.Factory.StartNew(SyncJob, new {Id = i});
+                    Task.Factory.StartNew(SyncJob, new {Id = i});
                 }
             });
 
-            Console.WriteLine("===========================================");
+            Console.WriteLine("===================== Aysnc Job ======================");
 
             LogRunningTime(() =>
             {
@@ -105,7 +152,7 @@ namespace AsyncAwaitConsole
 
             callback();
 
-            while (awailableWorkingThreadCount != maxWorkerThreads)
+            while (maxWorkerThreads != awailableWorkingThreadCount)
             {
                 Thread.Sleep(500);
                 ThreadPool.GetAvailableThreads(out awailableWorkingThreadCount, out awailableAsyncIoThreadCount);
